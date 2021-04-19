@@ -99,6 +99,8 @@ def main():
     else:
         print("=> no model found at '{}'".format(args.modelpath))
 
+    validate(train_loader, model, criterion, normalizer, test=False)
+    validate(val_loader, model, criterion, normalizer, test=False)
     validate(test_loader, model, criterion, normalizer, test=True)
 
 

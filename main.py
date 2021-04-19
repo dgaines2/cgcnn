@@ -200,10 +200,14 @@ def main():
         }, is_best)
 
     # test best model
-    print('---------Evaluate Model on Test Set---------------')
     best_checkpoint = torch.load('model_best.pth.tar')
     model.load_state_dict(best_checkpoint['state_dict'])
-    validate(test_loader, model, criterion, normalizer, test=True)
+    print('---------Evaluate Model on Train Set---------------')
+    validate(train_loader, model, criterion, normalizer, test=True, fname='train_results.csv')
+    print('---------Evaluate Model on Val Set---------------')
+    validate(val_loader, model, criterion, normalizer, test=True, fname='val_results.csv')
+    print('---------Evaluate Model on Test Set---------------')
+    validate(test_loader, model, criterion, normalizer, test=True, fname='test_results.csv')
 
 
 def train(train_loader, model, criterion, optimizer, epoch, normalizer):
@@ -302,7 +306,7 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
                 )
 
 
-def validate(val_loader, model, criterion, normalizer, test=False):
+def validate(val_loader, model, criterion, normalizer, test=False, fname='test_results.csv'):
     batch_time = AverageMeter()
     losses = AverageMeter()
     if args.task == 'regression':
@@ -406,7 +410,7 @@ def validate(val_loader, model, criterion, normalizer, test=False):
     if test:
         star_label = '**'
         import csv
-        with open('test_results.csv', 'w') as f:
+        with open(fname, 'w') as f:
             writer = csv.writer(f)
             for cif_id, target, pred in zip(test_cif_ids, test_targets,
                                             test_preds):
