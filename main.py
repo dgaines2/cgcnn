@@ -5,6 +5,7 @@ import sys
 import time
 import warnings
 from random import sample
+sys.path.append('..')
 
 import numpy as np
 import torch
