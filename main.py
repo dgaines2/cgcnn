@@ -5,6 +5,7 @@ import sys
 import time
 import warnings
 from random import sample
+sys.path.append('..')
 
 import numpy as np
 import torch
@@ -35,6 +36,8 @@ parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
+parser.add_argument('--dropout-rate', default=0, type=float, metavar='N',
+                    help='choose a dropout rate (default: 0)')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate (default: '
                                        '0.01)')
@@ -133,7 +136,9 @@ def main():
                                 h_fea_len=args.h_fea_len,
                                 n_h=args.n_h,
                                 classification=True if args.task ==
-                                                       'classification' else False)
+                                                       'classification' else False,
+                                dropout_rate=args.dropout_rate)
+
     if args.cuda:
         model.cuda()
 
@@ -202,12 +207,9 @@ def main():
     # test best model
     best_checkpoint = torch.load('model_best.pth.tar')
     model.load_state_dict(best_checkpoint['state_dict'])
-    print('---------Evaluate Model on Train Set---------------')
-    validate(train_loader, model, criterion, normalizer, test=True, fname='train_results.csv')
-    print('---------Evaluate Model on Val Set---------------')
-    validate(val_loader, model, criterion, normalizer, test=True, fname='val_results.csv')
-    print('---------Evaluate Model on Test Set---------------')
-    validate(test_loader, model, criterion, normalizer, test=True, fname='test_results.csv')
+    validate(train_loader, model, criterion, normalizer, test=True, fname='train_results')
+    validate(val_loader, model, criterion, normalizer, test=True, fname='val_results')
+    validate(test_loader, model, criterion, normalizer, test=True, fname='test_results')
 
 
 def train(train_loader, model, criterion, optimizer, epoch, normalizer):
@@ -306,7 +308,7 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
                 )
 
 
-def validate(val_loader, model, criterion, normalizer, test=False, fname='test_results.csv'):
+def validate(val_loader, model, criterion, normalizer, test=False, fname='test_results'):
     batch_time = AverageMeter()
     losses = AverageMeter()
     if args.task == 'regression':
@@ -321,6 +323,19 @@ def validate(val_loader, model, criterion, normalizer, test=False, fname='test_r
         test_targets = []
         test_preds = []
         test_cif_ids = []
+        if 'train' in fname:
+            str_out = '---------Evaluate Model on Train Set---------------'
+        elif 'val' in fname:
+            str_out = '---------Evaluate Model on Val Set---------------'
+        else: 
+            str_out = '---------Evaluate Model on Test Set---------------'
+        print(str_out)
+        if not os.path.exists("results.out"):
+            with open("results.out", "w+") as f:
+                f.write(str_out+'\n')
+        else:
+            with open("results.out", "a") as f:
+                f.write(str_out+'\n')
 
     # switch to evaluate mode
     model.eval()
@@ -388,14 +403,14 @@ def validate(val_loader, model, criterion, normalizer, test=False, fname='test_r
 
         if i % args.print_freq == 0:
             if args.task == 'regression':
-                print('Test: [{0}/{1}]\t'
+                str_out = ('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
                     i, len(val_loader), batch_time=batch_time, loss=losses,
                     mae_errors=mae_errors))
             else:
-                print('Test: [{0}/{1}]\t'
+                str_out = ('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
@@ -406,11 +421,14 @@ def validate(val_loader, model, criterion, normalizer, test=False, fname='test_r
                     i, len(val_loader), batch_time=batch_time, loss=losses,
                     accu=accuracies, prec=precisions, recall=recalls,
                     f1=fscores, auc=auc_scores))
+            print(str_out)
 
     if test:
         star_label = '**'
         import csv
-        with open(fname, 'w') as f:
+        with open("results.out", "a") as fw:
+            fw.write(str_out+'\n')
+        with open(f'{fname}.csv', 'w') as f:
             writer = csv.writer(f)
             for cif_id, target, pred in zip(test_cif_ids, test_targets,
                                             test_preds):
@@ -418,8 +436,12 @@ def validate(val_loader, model, criterion, normalizer, test=False, fname='test_r
     else:
         star_label = '*'
     if args.task == 'regression':
-        print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
-                                                        mae_errors=mae_errors))
+        str_out =' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
+                                                        mae_errors=mae_errors)
+        print(str_out)
+        if test:
+            with open("results.out", "a") as f:
+                f.write(str_out+'\n')
         return mae_errors.avg
     else:
         print(' {star} AUC {auc.avg:.3f}'.format(star=star_label,

@@ -81,7 +81,7 @@ class CrystalGraphConvNet(nn.Module):
     """
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
                  atom_fea_len=64, n_conv=3, h_fea_len=128, n_h=1,
-                 classification=False):
+                 dropout_rate=0, classification=False):
         """
         Initialize CrystalGraphConvNet.
 
@@ -100,9 +100,13 @@ class CrystalGraphConvNet(nn.Module):
           Number of hidden features after pooling
         n_h: int
           Number of hidden layers after pooling
+        use_dropout:
+          Use dropout in hidden layers after pooling
         """
         super(CrystalGraphConvNet, self).__init__()
         self.classification = classification
+        self.use_dropout = True if dropout_rate != 0 else False
+        self.dropout_rate = dropout_rate
         self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len)
         self.convs = nn.ModuleList([ConvLayer(atom_fea_len=atom_fea_len,
                                     nbr_fea_len=nbr_fea_len)
@@ -119,8 +123,11 @@ class CrystalGraphConvNet(nn.Module):
         else:
             self.fc_out = nn.Linear(h_fea_len, 1)
         if self.classification:
+            dropout_rate = 0.5
             self.logsoftmax = nn.LogSoftmax(dim=1)
-            self.dropout = nn.Dropout()
+            self.dropout = nn.Dropout(dropout_rate)
+        if self.use_dropout:
+            self.dropout = nn.Dropout(self.dropout_rate)
 
     def forward(self, atom_fea, nbr_fea, nbr_fea_idx, crystal_atom_idx):
         """
@@ -155,11 +162,16 @@ class CrystalGraphConvNet(nn.Module):
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
         crys_fea = self.conv_to_fc(self.conv_to_fc_softplus(crys_fea))
         crys_fea = self.conv_to_fc_softplus(crys_fea)
-        if self.classification:
-            crys_fea = self.dropout(crys_fea)
         if hasattr(self, 'fcs') and hasattr(self, 'softpluses'):
             for fc, softplus in zip(self.fcs, self.softpluses):
-                crys_fea = softplus(fc(crys_fea))
+                if self.use_dropout:
+                    crys_fea = self.dropout(crys_fea)
+                    crys_fea = fc(crys_fea)
+                    crys_fea = softplus(crys_fea)
+                else:
+                    crys_fea = softplus(fc(crys_fea))
+        if self.use_dropout:
+            crys_fea = self.dropout(crys_fea)
         out = self.fc_out(crys_fea)
         if self.classification:
             out = self.logsoftmax(out)
