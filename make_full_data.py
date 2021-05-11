@@ -1,4 +1,5 @@
-import sys 
+import sys
+
 sys.path.append("../..")
 import os
 import pickle
@@ -7,6 +8,7 @@ from contextlib import contextmanager
 from megnet_t_funcs import get_selected_temperatures
 from pymatgen.io.cif import CifWriter
 from alive_progress import alive_bar
+
 
 @contextmanager
 def change_directory(new_dir):
@@ -17,7 +19,8 @@ def change_directory(new_dir):
     finally:
         os.chdir(prev_dir)
 
-with open("../data.pickle", 'rb') as fr:
+
+with open("../data.pickle", "rb") as fr:
     data = pickle.load(fr)
 
 x_train = data["x_train"]
@@ -38,9 +41,9 @@ id_prop = []
 with alive_bar(len(all_x)) as bar:
     for x, y, mp in zip(all_x, all_y, all_mpids):
         if x.state == [[600]]:
-            id_prop.append([f'mp-{mp}', y])
+            id_prop.append([f"mp-{mp}", y])
             cw = CifWriter(x, symprec=0.001)
             cw.write_file(f"structures/mp-{mp}.cif")
         bar()
 
-np.savetxt("structures/id_prop.csv", id_prop, delimiter=',', fmt='%s')
+np.savetxt("structures/id_prop.csv", id_prop, delimiter=",", fmt="%s")
