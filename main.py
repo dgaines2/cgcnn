@@ -87,7 +87,6 @@ parser.add_argument(
     metavar="N",
     help="milestones for scheduler (default: " "[100])",
 )
-<<<<<<< HEAD
 parser.add_argument(
     "--momentum",
     default=0.9,
@@ -95,9 +94,6 @@ parser.add_argument(
     metavar="M",
     help="momentum",
 )
-=======
-parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
->>>>>>> cc684bee60d3d3abdafde3ecabe6f7cfddedc52c
 parser.add_argument(
     "--weight-decay",
     "--wd",
@@ -121,7 +117,6 @@ parser.add_argument(
     metavar="PATH",
     help="path to latest checkpoint (default: none)",
 )
-<<<<<<< HEAD
 parser.add_argument(
     "--cross-validation",
     "--cv",
@@ -131,8 +126,6 @@ parser.add_argument(
     help="Make k fold cross validation",
 )
 
-=======
->>>>>>> cc684bee60d3d3abdafde3ecabe6f7cfddedc52c
 train_group = parser.add_mutually_exclusive_group()
 train_group.add_argument(
     "--train-ratio",
@@ -219,6 +212,7 @@ if args.task == "regression":
     best_mae_error = 1e10
 else:
     best_mae_error = 0.0
+
 
 def cv():
     global args, best_mae_error
@@ -876,11 +870,7 @@ def adjust_learning_rate(optimizer, epoch, k):
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     if args.cross_validation != 0:
         cv()
     else:
         main()
-=======
-    main()
->>>>>>> cc684bee60d3d3abdafde3ecabe6f7cfddedc52c

@@ -36,6 +36,7 @@ class SubsetSampler(Sampler):
     def __init__(self, indices) -> None:
         self.indices = indices
 
+
 def get_cv_loader(
     dataset,
     collate_fn=default_collate,
