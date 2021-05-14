@@ -1,6 +1,0 @@
----------Evaluate Model on Train Set---------------
-Test: [0/7]	Time 0.021 (0.021)	Loss 0.0846 (0.0846)	MAE 0.100 (0.100)
----------Evaluate Model on Val Set---------------
-Test: [0/3]	Time 0.021 (0.021)	Loss 0.2805 (0.2805)	MAE 0.178 (0.178)
----------Evaluate Model on Test Set---------------
-Test: [0/3]	Time 5.608 (5.608)	Loss 0.3190 (0.3190)	MAE 0.177 (0.177)
