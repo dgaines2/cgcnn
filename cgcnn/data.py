@@ -6,13 +6,23 @@ import json
 import os
 import random
 import warnings
-
+from typing import Sequence
 import numpy as np
 import torch
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.sampler import Sampler, SequentialSampler, SubsetRandomSampler
+
+class SubsetSampler(Sampler):
+    def __init__(self, indices) -> None:
+        self.indices = indices
+
+    def __iter__(self):
+        return (i for i in self.indices)
+
+    def __len__(self):
+        return len(self.indices)
 
 
 def get_train_val_test_loader(
@@ -77,10 +87,10 @@ def get_train_val_test_loader(
         valid_size = kwargs["val_size"]
     else:
         valid_size = int(val_ratio * total_size)
-    train_sampler = SubsetRandomSampler(indices[:train_size])
-    val_sampler = SubsetRandomSampler(indices[-(valid_size + test_size) : -test_size])
+    train_sampler = SubsetSampler(indices[:train_size])
+    val_sampler = SubsetSampler(indices[-(valid_size + test_size) : -test_size])
     if return_test:
-        test_sampler = SubsetRandomSampler(indices[-test_size:])
+        test_sampler = SubsetSampler(indices[-test_size:])
     train_loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -326,7 +336,7 @@ class CIFData(Dataset):
     """
 
     def __init__(
-        self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2, random_seed=123
+        self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2, random_seed=0
     ):
         self.root_dir = root_dir
         self.max_num_nbr, self.radius = max_num_nbr, radius
@@ -336,7 +346,7 @@ class CIFData(Dataset):
         with open(id_prop_file) as f:
             reader = csv.reader(f)
             self.id_prop_data = [row for row in reader]
-        rng = np.random.default_rng(0)
+        rng = np.random.default_rng(random_seed)
         rng.shuffle(self.id_prop_data)
         atom_init_file = os.path.join(self.root_dir, "atom_init.json")
         assert os.path.exists(atom_init_file), "atom_init.json does not exist!"

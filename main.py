@@ -591,16 +591,8 @@ def validate(
     else:
         star_label = "*"
     if args.task == "regression":
-        str_out = " {star} MAE {mae_errors.avg:.3f}".format(
-            star=star_label, mae_errors=mae_errors
-        )
-        print(str_out)
-        if test:
-            with open("results.out", "a") as f:
-                f.write(str_out + "\n")
         return mae_errors.avg
     else:
-        print(" {star} AUC {auc.avg:.3f}".format(star=star_label, auc=auc_scores))
         return auc_scores.avg
 
 
