@@ -9,6 +9,7 @@ import warnings
 from typing import Sequence
 import numpy as np
 import torch
+from sklearn.model_selection import KFold
 from pymatgen.core.structure import Structure
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
@@ -26,6 +27,66 @@ class SubsetSampler(Sampler):
         return len(self.indices)
 
 
+def make_cv_splitter(x, n_splits):
+    for train_indices, val_indices in KFold(n_splits).split(x):
+        yield train_indices, val_indices
+
+
+def get_cv_loader(
+    dataset,
+    collate_fn=default_collate,
+    batch_size=64,
+    train_ratio=None,
+    test_ratio=0.1,
+    num_workers=1,
+    pin_memory=False,
+    cross_validation=5,
+    **kwargs,
+):
+    total_size = len(dataset)
+    assert train_ratio + test_ratio <= 1
+    indices = list(range(total_size))
+    if kwargs["train_size"]:
+        train_size = kwargs["train_size"]
+    else:
+        train_size = int(train_ratio * total_size)
+    if kwargs["test_size"]:
+        test_size = kwargs["test_size"]
+    else:
+        test_size = int(test_ratio * total_size)
+    for train_indices, val_indices in make_cv_splitter(
+        indices[:train_size], cross_validation
+    ):
+        train_sampler = SubsetSampler(train_indices)
+        val_sampler = SubsetSampler(val_indices)
+        test_sampler = SubsetSampler(indices[-test_size:])
+        train_loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=train_sampler,
+            num_workers=num_workers,
+            collate_fn=collate_fn,
+            pin_memory=pin_memory,
+        )
+        val_loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=val_sampler,
+            num_workers=num_workers,
+            collate_fn=collate_fn,
+            pin_memory=pin_memory,
+        )
+        test_loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=test_sampler,
+            num_workers=num_workers,
+            collate_fn=collate_fn,
+            pin_memory=pin_memory,
+        )
+        yield train_loader, val_loader, test_loader
+
+
 def get_train_val_test_loader(
     dataset,
     collate_fn=default_collate,
@@ -36,7 +97,7 @@ def get_train_val_test_loader(
     return_test=False,
     num_workers=1,
     pin_memory=False,
-    **kwargs
+    **kwargs,
 ):
     """
     Utility function for dividing a dataset to train, val, test datasets.
@@ -62,7 +123,7 @@ def get_train_val_test_loader(
     -------
     train_loader: torch.utils.data.DataLoader
       DataLoader that random samples the training data.
-    val_loader: torch.utils.data.DataLoader
+    (val_loader): torch.utils.data.DataLoader
       DataLoader that random samples the validation data.
     (test_loader): torch.utils.data.DataLoader
       DataLoader that random samples the test data, returns if
@@ -90,8 +151,7 @@ def get_train_val_test_loader(
         valid_size = int(val_ratio * total_size)
     train_sampler = SubsetSampler(indices[:train_size])
     val_sampler = SubsetSampler(indices[-(valid_size + test_size) : -test_size])
-    if return_test:
-        test_sampler = SubsetSampler(indices[-test_size:])
+    test_sampler = SubsetSampler(indices[-test_size:])
     train_loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -117,10 +177,9 @@ def get_train_val_test_loader(
             collate_fn=collate_fn,
             pin_memory=pin_memory,
         )
-    if return_test:
         return train_loader, val_loader, test_loader
     else:
-        return train_loader, val_loader
+        yield train_loader, val_loader
 
 
 def collate_pool(dataset_list):

@@ -15,7 +15,7 @@ from torch.autograd import Variable
 from torch.optim.lr_scheduler import MultiStepLR
 
 from cgcnn.data import CIFData
-from cgcnn.data import collate_pool, get_train_val_test_loader
+from cgcnn.data import collate_pool, get_train_val_test_loader, get_cv_loader
 from cgcnn.model import CrystalGraphConvNet
 
 parser = argparse.ArgumentParser(
@@ -87,7 +87,13 @@ parser.add_argument(
     metavar="N",
     help="milestones for scheduler (default: " "[100])",
 )
-parser.add_argument("--momentum", default=0.9, type=float, metavar="M", help="momentum")
+parser.add_argument(
+    "--momentum",
+    default=0.9,
+    type=float,
+    metavar="M",
+    help="momentum",
+)
 parser.add_argument(
     "--weight-decay",
     "--wd",
@@ -111,6 +117,15 @@ parser.add_argument(
     metavar="PATH",
     help="path to latest checkpoint (default: none)",
 )
+parser.add_argument(
+    "--cross-validation",
+    "--cv",
+    default=0,
+    type=int,
+    metavar="N",
+    help="Make k fold cross validation",
+)
+
 train_group = parser.add_mutually_exclusive_group()
 train_group.add_argument(
     "--train-ratio",
@@ -199,6 +214,164 @@ else:
     best_mae_error = 0.0
 
 
+def cv():
+    global args, best_mae_error
+
+    os.mkdir("./checkpoints")
+    # load data
+    dataset = CIFData(*args.data_options)
+    collate_fn = collate_pool
+    i = 0
+    train_maes = []
+    val_maes = []
+    test_maes = []
+    for train_loader, val_loader, test_loader in get_cv_loader(
+        dataset=dataset,
+        collate_fn=collate_fn,
+        batch_size=args.batch_size,
+        train_ratio=args.train_ratio,
+        num_workers=args.workers,
+        test_ratio=args.test_ratio,
+        pin_memory=args.cuda,
+        train_size=args.train_size,
+        val_size=args.val_size,
+        test_size=args.test_size,
+        cross_validation=args.cross_validation,
+    ):
+        i += 1
+        # obtain target value normalizer
+        if args.task == "classification":
+            normalizer = Normalizer(torch.zeros(2))
+            normalizer.load_state_dict({"mean": 0.0, "std": 1.0})
+        else:
+            if len(dataset) < 500:
+                warnings.warn(
+                    "Dataset has less than 500 data points. "
+                    "Lower accuracy is expected. "
+                )
+                sample_data_list = [dataset[i] for i in range(len(dataset))]
+            else:
+                sample_data_list = [
+                    dataset[i] for i in sample(range(len(dataset)), 500)
+                ]
+            _, sample_target, _ = collate_pool(sample_data_list)
+            normalizer = Normalizer(sample_target)
+
+        # build model
+        structures, _, _ = dataset[0]
+        orig_atom_fea_len = structures[0].shape[-1]
+        nbr_fea_len = structures[1].shape[-1]
+        model = CrystalGraphConvNet(
+            orig_atom_fea_len,
+            nbr_fea_len,
+            atom_fea_len=args.atom_fea_len,
+            n_conv=args.n_conv,
+            h_fea_len=args.h_fea_len,
+            n_h=args.n_h,
+            classification=True if args.task == "classification" else False,
+            dropout_rate=args.dropout_rate,
+        )
+
+        if args.cuda:
+            model.cuda()
+
+        # define loss func and optimizer
+        if args.task == "classification":
+            criterion = nn.NLLLoss()
+        else:
+            criterion = nn.MSELoss()
+        if args.optim == "SGD":
+            optimizer = optim.SGD(
+                model.parameters(),
+                args.lr,
+                momentum=args.momentum,
+                weight_decay=args.weight_decay,
+            )
+        elif args.optim == "Adam":
+            optimizer = optim.Adam(
+                model.parameters(), args.lr, weight_decay=args.weight_decay
+            )
+        else:
+            raise NameError("Only SGD or Adam is allowed as --optim")
+
+        scheduler = MultiStepLR(optimizer, milestones=args.lr_milestones, gamma=0.1)
+
+        print(f"Split {i}")
+        if args.task == "regression":
+            best_mae_error = 1e10
+        else:
+            best_mae_error = 0.0
+        for epoch in range(args.start_epoch, args.epochs):
+            # train for one epoch
+            train(train_loader, model, criterion, optimizer, epoch, normalizer)
+
+            # evaluate on validation set
+            mae_error = validate(val_loader, model, criterion, normalizer)
+
+            if mae_error != mae_error:
+                print("Exit due to NaN")
+                sys.exit(1)
+
+            scheduler.step()
+
+            # remember the best mae_eror and save checkpoint
+            if args.task == "regression":
+                is_best = mae_error < best_mae_error
+                best_mae_error = min(mae_error, best_mae_error)
+            else:
+                is_best = mae_error > best_mae_error
+                best_mae_error = max(mae_error, best_mae_error)
+            save_checkpoint(
+                {
+                    "epoch": epoch + 1,
+                    "state_dict": model.state_dict(),
+                    "best_mae_error": best_mae_error,
+                    "optimizer": optimizer.state_dict(),
+                    "normalizer": normalizer.state_dict(),
+                    "args": vars(args),
+                },
+                is_best,
+                pad_string=f"./checkpoints/{i}",
+            )
+
+        # test best model
+        best_checkpoint = torch.load(f"./checkpoints/{i}_model_best.pth.tar")
+        model.load_state_dict(best_checkpoint["state_dict"])
+        train_mae = validate(
+            train_loader,
+            model,
+            criterion,
+            normalizer,
+            test=True,
+            split=i,
+            to_save=False,
+        )
+        val_mae = validate(
+            val_loader,
+            model,
+            criterion,
+            normalizer,
+            test=True,
+            to_save=False,
+        )
+        test_mae = validate(
+            test_loader,
+            model,
+            criterion,
+            normalizer,
+            test=True,
+            to_save=False,
+        )
+        train_maes.append(train_mae.detach().item())
+        val_maes.append(val_mae.detach().item())
+        test_maes.append(test_mae.detach().item())
+    with open("results.out", "a+") as fw:
+        fw.write("\n")
+        fw.write(f"Avg Train MAE: {np.mean(train_maes):.4f}\n")
+        fw.write(f"Avg Val MAE: {np.mean(val_maes):.4f}\n")
+        fw.write(f"Avg Test MAE: {np.mean(test_maes):.4f}\n")
+
+
 def main():
     global args, best_mae_error
 
@@ -217,6 +390,7 @@ def main():
         train_size=args.train_size,
         val_size=args.val_size,
         test_size=args.test_size,
+        return_val=True,
         return_test=True,
     )
 
@@ -447,7 +621,14 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
 
 
 def validate(
-    val_loader, model, criterion, normalizer, test=False, fname="test_results"
+    val_loader,
+    model,
+    criterion,
+    normalizer,
+    test=False,
+    fname="test_results",
+    split=None,
+    to_save=True,
 ):
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -469,6 +650,8 @@ def validate(
             str_out = "---------Evaluate Model on Val Set---------------"
         else:
             str_out = "---------Evaluate Model on Test Set---------------"
+        if split is not None:
+            str_out = f"Split {split}\n" + str_out
         print(str_out)
         if not os.path.exists("results.out"):
             with open("results.out", "w+") as f:
@@ -584,12 +767,11 @@ def validate(
 
         with open("results.out", "a") as fw:
             fw.write(str_out + "\n")
-        with open(f"{fname}.csv", "w") as f:
-            writer = csv.writer(f)
-            for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
-                writer.writerow((cif_id, target, pred))
-    else:
-        star_label = "*"
+        if to_save:
+            with open(f"{fname}.csv", "w") as f:
+                writer = csv.writer(f)
+                for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
+                    writer.writerow((cif_id, target, pred))
     if args.task == "regression":
         return mae_errors.avg
     else:
@@ -597,7 +779,7 @@ def validate(
 
 
 class Normalizer(object):
-    """Normalize a Tensor and restore it later. """
+    """Normalize a Tensor and restore it later."""
 
     def __init__(self, tensor):
         """tensor is taken as a sample to calculate the mean and std"""
@@ -668,10 +850,15 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
+def save_checkpoint(state, is_best, filename="checkpoint.pth.tar", pad_string=None):
+    if pad_string is not None:
+        filename = f"{pad_string}_{filename}"
+        best_name = f"{pad_string}_model_best.pth.tar"
+    else:
+        best_name = "model_best.pth.tar"
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, "model_best.pth.tar")
+        shutil.copyfile(filename, best_name)
 
 
 def adjust_learning_rate(optimizer, epoch, k):
@@ -683,4 +870,7 @@ def adjust_learning_rate(optimizer, epoch, k):
 
 
 if __name__ == "__main__":
-    main()
+    if args.cross_validation != 0:
+        cv()
+    else:
+        main()
