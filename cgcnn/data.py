@@ -179,7 +179,7 @@ def get_train_val_test_loader(
         )
         return train_loader, val_loader, test_loader
     else:
-        yield train_loader, val_loader
+        return train_loader, val_loader
 
 
 def collate_pool(dataset_list):
