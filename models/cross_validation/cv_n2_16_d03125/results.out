@@ -1,0 +1,39 @@
+Split 1
+---------Evaluate Model on Test Set---------------
+Test: [0/7]	Time 0.024 (0.024)	Loss 0.0707 (0.0707)	MAE 0.094 (0.094)
+---------Evaluate Model on Test Set---------------
+Test: [0/2]	Time 0.023 (0.023)	Loss 0.3401 (0.3401)	MAE 0.170 (0.170)
+---------Evaluate Model on Test Set---------------
+Test: [0/3]	Time 4.476 (4.476)	Loss 0.3427 (0.3427)	MAE 0.182 (0.182)
+Split 2
+---------Evaluate Model on Test Set---------------
+Test: [0/7]	Time 0.024 (0.024)	Loss 0.0662 (0.0662)	MAE 0.089 (0.089)
+---------Evaluate Model on Test Set---------------
+Test: [0/2]	Time 0.023 (0.023)	Loss 0.2398 (0.2398)	MAE 0.160 (0.160)
+---------Evaluate Model on Test Set---------------
+Test: [0/3]	Time 0.025 (0.025)	Loss 0.2496 (0.2496)	MAE 0.168 (0.168)
+Split 3
+---------Evaluate Model on Test Set---------------
+Test: [0/7]	Time 0.024 (0.024)	Loss 0.0604 (0.0604)	MAE 0.085 (0.085)
+---------Evaluate Model on Test Set---------------
+Test: [0/2]	Time 0.023 (0.023)	Loss 0.1529 (0.1529)	MAE 0.137 (0.137)
+---------Evaluate Model on Test Set---------------
+Test: [0/3]	Time 0.025 (0.025)	Loss 0.2531 (0.2531)	MAE 0.172 (0.172)
+Split 4
+---------Evaluate Model on Test Set---------------
+Test: [0/7]	Time 0.024 (0.024)	Loss 0.0428 (0.0428)	MAE 0.067 (0.067)
+---------Evaluate Model on Test Set---------------
+Test: [0/2]	Time 0.023 (0.023)	Loss 0.2486 (0.2486)	MAE 0.171 (0.171)
+---------Evaluate Model on Test Set---------------
+Test: [0/3]	Time 0.024 (0.024)	Loss 0.2354 (0.2354)	MAE 0.165 (0.165)
+Split 5
+---------Evaluate Model on Test Set---------------
+Test: [0/7]	Time 0.024 (0.024)	Loss 0.0784 (0.0784)	MAE 0.090 (0.090)
+---------Evaluate Model on Test Set---------------
+Test: [0/2]	Time 0.023 (0.023)	Loss 0.2946 (0.2946)	MAE 0.177 (0.177)
+---------Evaluate Model on Test Set---------------
+Test: [0/3]	Time 0.024 (0.024)	Loss 0.2930 (0.2930)	MAE 0.170 (0.170)
+
+Avg Train MAE: 0.0802
+Avg Val MAE: 0.1591
+Avg Test MAE: 0.1605
