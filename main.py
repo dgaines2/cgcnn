@@ -1,4 +1,5 @@
 import argparse
+import csv
 import os
 import shutil
 import sys
@@ -344,6 +345,7 @@ def cv():
             normalizer,
             test=True,
             split=i,
+            fname='train',
             to_save=False,
         )
         val_mae = validate(
@@ -352,6 +354,7 @@ def cv():
             criterion,
             normalizer,
             test=True,
+            fname='val',
             to_save=False,
         )
         test_mae = validate(
@@ -360,6 +363,7 @@ def cv():
             criterion,
             normalizer,
             test=True,
+            fname='test',
             to_save=False,
         )
         train_maes.append(train_mae.detach().item())
@@ -763,18 +767,24 @@ def validate(
 
     if test:
         star_label = "**"
-        import csv
-
-        with open("results.out", "a") as fw:
-            fw.write(str_out + "\n")
         if to_save:
             with open(f"{fname}.csv", "w") as f:
                 writer = csv.writer(f)
                 for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
                     writer.writerow((cif_id, target, pred))
+        if args.task == 'regression':
+            with open("results.out", "a") as fw:
+                fw.write(f"{star_label}  MAE: {mae_errors.avg:.4f}\n")
+        else: 
+            with open("results.out", "a") as fw:
+                fw.write(f"{star_label}  AUC: {auc_scores.avg:.4f}\n")
+    else:
+        star_label = "*"
     if args.task == "regression":
+        print(f"{star_label} {mae_errors.avg:.4f}")
         return mae_errors.avg
     else:
+        print(f"{star_label} {auc_scores.avg:.4f}")
         return auc_scores.avg
 
 
