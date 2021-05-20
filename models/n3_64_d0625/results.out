@@ -1,0 +1,6 @@
+---------Evaluate Model on Train Set---------------
+**  MAE: 0.0729
+---------Evaluate Model on Val Set---------------
+**  MAE: 0.1408
+---------Evaluate Model on Test Set---------------
+**  MAE: 0.1419
