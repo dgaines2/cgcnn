@@ -396,7 +396,7 @@ class CIFData(Dataset):
     """
 
     def __init__(
-        self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2, random_seed=0
+        self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2, random_seed=0, shuffle=True, store_bad_indices=False,
     ):
         self.root_dir = root_dir
         self.max_num_nbr, self.radius = max_num_nbr, radius
@@ -406,12 +406,16 @@ class CIFData(Dataset):
         with open(id_prop_file) as f:
             reader = csv.reader(f)
             self.id_prop_data = [row for row in reader]
-        rng = np.random.default_rng(random_seed)
-        rng.shuffle(self.id_prop_data)
+        if shuffle:
+            rng = np.random.default_rng(random_seed)
+            rng.shuffle(self.id_prop_data)
         atom_init_file = os.path.join(self.root_dir, "atom_init.json")
         assert os.path.exists(atom_init_file), "atom_init.json does not exist!"
         self.ari = AtomCustomJSONInitializer(atom_init_file)
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
+        self.store_bad_indices = store_bad_indices
+        if store_bad_indices:
+            self.bad_indices = []
 
     def __len__(self):
         return len(self.id_prop_data)
@@ -430,6 +434,7 @@ class CIFData(Dataset):
         all_nbrs = crystal.get_all_neighbors(self.radius, include_index=True)
         all_nbrs = [sorted(nbrs, key=lambda x: x[1]) for nbrs in all_nbrs]
         nbr_fea_idx, nbr_fea = [], []
+        bad_indices = []
         for nbr in all_nbrs:
             if len(nbr) < self.max_num_nbr:
                 warnings.warn(
@@ -444,6 +449,8 @@ class CIFData(Dataset):
                     list(map(lambda x: x[1], nbr))
                     + [self.radius + 1.0] * (self.max_num_nbr - len(nbr))
                 )
+                if self.store_bad_indices:
+                    self.bad_indices.append(idx)
             else:
                 nbr_fea_idx.append(list(map(lambda x: x[2], nbr[: self.max_num_nbr])))
                 nbr_fea.append(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))

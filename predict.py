@@ -3,8 +3,9 @@ import os
 import shutil
 import sys
 import time
-
+import csv
 import numpy as np
+
 import torch
 import torch.nn as nn
 from sklearn import metrics
@@ -67,7 +68,7 @@ def main():
     global args, model_args, best_mae_error
 
     # load data
-    dataset = CIFData(args.cifpath)
+    dataset = CIFData(args.cifpath, shuffle=False, store_bad_indices=True)
     collate_fn = collate_pool
     test_loader = DataLoader(
         dataset,
@@ -121,6 +122,7 @@ def main():
     validate(
         test_loader, model, criterion, normalizer, test=True, fname="predictions"
     )
+    print(dataset.bad_indices)
 
 
 def validate(
@@ -151,8 +153,10 @@ def validate(
             str_out = "---------Evaluate Model on Train Set---------------"
         elif "val" in fname:
             str_out = "---------Evaluate Model on Val Set---------------"
-        else:
+        elif "test" in fname:
             str_out = "---------Evaluate Model on Test Set---------------"
+        else:
+            str_out = ""
         if split is not None:
             str_out = f"Split {split}\n" + str_out
         print(str_out)
