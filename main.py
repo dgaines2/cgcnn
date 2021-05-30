@@ -345,7 +345,7 @@ def cv():
             normalizer,
             test=True,
             split=i,
-            fname='train',
+            fname="train",
             to_save=False,
         )
         val_mae = validate(
@@ -354,7 +354,7 @@ def cv():
             criterion,
             normalizer,
             test=True,
-            fname='val',
+            fname="val",
             to_save=False,
         )
         test_mae = validate(
@@ -363,7 +363,7 @@ def cv():
             criterion,
             normalizer,
             test=True,
-            fname='test',
+            fname="test",
             to_save=False,
         )
         train_maes.append(train_mae.detach().item())
@@ -772,10 +772,10 @@ def validate(
                 writer = csv.writer(f)
                 for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
                     writer.writerow((cif_id, target, pred))
-        if args.task == 'regression':
+        if args.task == "regression":
             with open("results.out", "a") as fw:
                 fw.write(f"{star_label}  MAE: {mae_errors.avg:.4f}\n")
-        else: 
+        else:
             with open("results.out", "a") as fw:
                 fw.write(f"{star_label}  AUC: {auc_scores.avg:.4f}\n")
     else:
