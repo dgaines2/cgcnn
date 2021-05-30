@@ -72,7 +72,7 @@ def main():
     test_loader = DataLoader(
         dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=args.workers,
         collate_fn=collate_fn,
         pin_memory=args.cuda,
@@ -119,7 +119,7 @@ def main():
         print("=> no model found at '{}'".format(args.modelpath))
 
     validate(
-        test_loader, model, criterion, normalizer, test=True, fname="predict_results"
+        test_loader, model, criterion, normalizer, test=True, fname="predictions"
     )
 
 
@@ -135,7 +135,7 @@ def validate(
 ):
     batch_time = AverageMeter()
     losses = AverageMeter()
-    if args.task == "regression":
+    if model_args.task == "regression":
         mae_errors = AverageMeter()
     else:
         accuracies = AverageMeter()
@@ -179,7 +179,7 @@ def validate(
         else:
             with torch.no_grad():
                 input_var = (Variable(input[0]), Variable(input[1]), input[2], input[3])
-        if args.task == "regression":
+        if model_args.task == "regression":
             target_normed = normalizer.norm(target)
         else:
             target_normed = target.view(-1).long()
@@ -195,7 +195,7 @@ def validate(
         loss = criterion(output, target_var)
 
         # measure accuracy and record loss
-        if args.task == "regression":
+        if model_args.task == "regression":
             mae_error = mae(normalizer.denorm(output.data.cpu()), target)
             losses.update(loss.data.cpu().item(), target.size(0))
             mae_errors.update(mae_error, target.size(0))
@@ -228,7 +228,7 @@ def validate(
         end = time.time()
 
         if i % args.print_freq == 0:
-            if args.task == "regression":
+            if model_args.task == "regression":
                 str_out = (
                     "Test: [{0}/{1}]\t"
                     "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
@@ -271,7 +271,7 @@ def validate(
                 writer = csv.writer(f)
                 for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
                     writer.writerow((cif_id, target, pred))
-        if args.task == "regression":
+        if model_args.task == "regression":
             with open("results.out", "a") as fw:
                 fw.write(f"{star_label}  MAE: {mae_errors.avg:.4f}\n")
         else:
@@ -279,7 +279,7 @@ def validate(
                 fw.write(f"{star_label}  AUC: {auc_scores.avg:.4f}\n")
     else:
         star_label = "*"
-    if args.task == "regression":
+    if model_args.task == "regression":
         print(f"{star_label} {mae_errors.avg:.4f}")
         return mae_errors.avg
     else:
