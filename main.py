@@ -218,7 +218,8 @@ else:
 def cv():
     global args, best_mae_error
 
-    os.mkdirp("./checkpoints")
+    if not os.path.exists("./checkpoints"):
+        os.mkdir("./checkpoints")
     # load data
     dataset = CIFData(*args.data_options)
     collate_fn = collate_pool
