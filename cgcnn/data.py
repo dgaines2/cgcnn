@@ -401,10 +401,19 @@ class CIFData(Dataset):
     """
 
     def __init__(
-        self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2, random_seed=0
+        self,
+        root_dir,
+        max_num_nbr=12,
+        radius=8,
+        dmin=0,
+        step=0.2,
+        random_seed=0,
+        shuffle=True,
+        store_bad_indices=False,
     ):
         self.root_dir = root_dir
-        self.max_num_nbr, self.radius = max_num_nbr, radius
+        self.max_num_nbr = max_num_nbr
+        self.radius = radius
         assert os.path.exists(root_dir), "root_dir does not exist!"
         id_prop_file = os.path.join(self.root_dir, "id_prop.csv")
         assert os.path.exists(id_prop_file), "id_prop.csv does not exist!"
@@ -417,6 +426,9 @@ class CIFData(Dataset):
         assert os.path.exists(atom_init_file), "atom_init.json does not exist!"
         self.ari = AtomCustomJSONInitializer(atom_init_file)
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
+        self.store_bad_indices = store_bad_indices
+        if store_bad_indices:
+            self.bad_indices = set()
 
     def __len__(self):
         return len(self.id_prop_data)
@@ -449,6 +461,8 @@ class CIFData(Dataset):
                     list(map(lambda x: x[1], nbr))
                     + [self.radius + 1.0] * (self.max_num_nbr - len(nbr))
                 )
+                if self.store_bad_indices:
+                    self.bad_indices.add(idx)
             else:
                 nbr_fea_idx.append(list(map(lambda x: x[2], nbr[: self.max_num_nbr])))
                 nbr_fea.append(list(map(lambda x: x[1], nbr[: self.max_num_nbr])))

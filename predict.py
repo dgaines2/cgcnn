@@ -118,9 +118,8 @@ def main():
     else:
         print("=> no model found at '{}'".format(args.modelpath))
 
-    validate(
-        test_loader, model, criterion, normalizer, test=True, fname="predict_results"
-    )
+    validate(test_loader, model, criterion, normalizer, test=True, fname="predictions")
+    print(dataset.bad_indices)
 
 
 def validate(
@@ -288,7 +287,7 @@ def validate(
 
 
 class Normalizer(object):
-    """Normalize a Tensor and restore it later. """
+    """Normalize a Tensor and restore it later."""
 
     def __init__(self, tensor):
         """tensor is taken as a sample to calculate the mean and std"""
