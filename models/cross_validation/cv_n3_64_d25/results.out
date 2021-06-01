@@ -1,0 +1,39 @@
+Split 1
+---------Evaluate Model on Train Set---------------
+**  MAE: 0.0671
+---------Evaluate Model on Val Set---------------
+**  MAE: 0.1528
+---------Evaluate Model on Test Set---------------
+**  MAE: 0.1541
+Split 2
+---------Evaluate Model on Train Set---------------
+**  MAE: 0.0749
+---------Evaluate Model on Val Set---------------
+**  MAE: 0.1544
+---------Evaluate Model on Test Set---------------
+**  MAE: 0.1603
+Split 3
+---------Evaluate Model on Train Set---------------
+**  MAE: 0.0773
+---------Evaluate Model on Val Set---------------
+**  MAE: 0.1493
+---------Evaluate Model on Test Set---------------
+**  MAE: 0.1521
+Split 4
+---------Evaluate Model on Train Set---------------
+**  MAE: 0.0646
+---------Evaluate Model on Val Set---------------
+**  MAE: 0.1655
+---------Evaluate Model on Test Set---------------
+**  MAE: 0.1512
+Split 5
+---------Evaluate Model on Train Set---------------
+**  MAE: 0.0863
+---------Evaluate Model on Val Set---------------
+**  MAE: 0.1591
+---------Evaluate Model on Test Set---------------
+**  MAE: 0.1625
+
+Avg Train MAE: 0.0740
+Avg Val MAE: 0.1562
+Avg Test MAE: 0.1561
