@@ -268,25 +268,29 @@ def cv():
 
         # build model
         structures, _, _ = dataset[0]
-        orig_atom_fea_len = structures[0][0].shape[-1]     #92 features per atom
-        ofm_fea= int(structures[0][1].shape[0]/structures[0][0].shape[0])
-        nbr_fea_len = structures[1].shape[-1]      # 41 features per atom neighbors'
-        orig_hot_fea_len = structures[0][1].shape[1]*ofm_fea       # 1056 features per crystal
+        orig_atom_fea_len = structures[0][0].shape[-1]  # 92 features per atom
+        ofm_fea = int(structures[0][1].shape[0] / structures[0][0].shape[0])
+        nbr_fea_len = structures[1].shape[-1]  # 41 features per atom neighbors'
+        orig_hot_fea_len = (
+            structures[0][1].shape[1] * ofm_fea
+        )  # 1056 features per crystal
         atom_fea_len = args.atom_fea_len
         hot_fea_len = args.hot_fea_len
         n_conv = args.n_conv
         h_fea_len = args.h_fea_len
         orig_atom_fea_len = orig_atom_fea_len + orig_hot_fea_len
 
-        model = OrbitalCrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,orig_hot_fea_len,
-                                     atom_fea_len=atom_fea_len,
-                                     hot_fea_len=hot_fea_len,
-                                     n_conv=n_conv,
-                                     h_fea_len=h_fea_len,
-                                     n_h=args.n_h,
-                                     classification=True if args.task ==
-                                                            'classification' else False,
-                                     dropout_rate=args.dropout_rate,
+        model = OrbitalCrystalGraphConvNet(
+            orig_atom_fea_len,
+            nbr_fea_len,
+            orig_hot_fea_len,
+            atom_fea_len=atom_fea_len,
+            hot_fea_len=hot_fea_len,
+            n_conv=n_conv,
+            h_fea_len=h_fea_len,
+            n_h=args.n_h,
+            classification=True if args.task == "classification" else False,
+            dropout_rate=args.dropout_rate,
         )
 
         if args.cuda:
@@ -431,25 +435,27 @@ def main():
 
     # build model
     structures, _, _ = dataset[0]
-    orig_atom_fea_len = structures[0][0].shape[-1]     #92 features per atom
-    ofm_fea= int(structures[0][1].shape[0]/structures[0][0].shape[0])
-    nbr_fea_len = structures[1].shape[-1]      # 41 features per atom neighbors'
-    orig_hot_fea_len = structures[0][1].shape[1]*ofm_fea       # 1056 features per crystal
+    orig_atom_fea_len = structures[0][0].shape[-1]  # 92 features per atom
+    ofm_fea = int(structures[0][1].shape[0] / structures[0][0].shape[0])
+    nbr_fea_len = structures[1].shape[-1]  # 41 features per atom neighbors'
+    orig_hot_fea_len = structures[0][1].shape[1] * ofm_fea  # 1056 features per crystal
     atom_fea_len = args.atom_fea_len
     hot_fea_len = args.hot_fea_len
     n_conv = args.n_conv
     h_fea_len = args.h_fea_len
     orig_atom_fea_len = orig_atom_fea_len + orig_hot_fea_len
 
-    model = OrbitalCrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,orig_hot_fea_len,
-                                 atom_fea_len=atom_fea_len,
-                                 hot_fea_len=hot_fea_len,
-                                 n_conv=n_conv,
-                                 h_fea_len=h_fea_len,
-                                 n_h=args.n_h,
-                                 classification=True if args.task ==
-                                                        'classification' else False,
-                                 dropout_rate=args.dropout_rate,
+    model = OrbitalCrystalGraphConvNet(
+        orig_atom_fea_len,
+        nbr_fea_len,
+        orig_hot_fea_len,
+        atom_fea_len=atom_fea_len,
+        hot_fea_len=hot_fea_len,
+        n_conv=n_conv,
+        h_fea_len=h_fea_len,
+        n_h=args.n_h,
+        classification=True if args.task == "classification" else False,
+        dropout_rate=args.dropout_rate,
     )
 
     if args.cuda:
@@ -551,19 +557,39 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
     epoch_loss = 0
 
     end = time.time()
-    for i, (input, target, batch_cif_ids) in enumerate(train_loader):     
+    for i, (input, target, batch_cif_ids) in enumerate(train_loader):
         data_time.update(time.time() - end)
 
         if args.cuda:
-            input_var = (Variable(torch.cat((input[0][0],input[0][1].reshape(int(input[0][1].shape[0]/32),1056)),dim=1).cuda(non_blocking=True)),
-                         Variable(input[1].cuda(non_blocking=True)),
-                         input[2].cuda(non_blocking=True),
-                         [crys_idx.cuda(non_blocking=True) for crys_idx in input[3]])
+            input_var = (
+                Variable(
+                    torch.cat(
+                        (
+                            input[0][0],
+                            input[0][1].reshape(int(input[0][1].shape[0] / 32), 1056),
+                        ),
+                        dim=1,
+                    ).cuda(non_blocking=True)
+                ),
+                Variable(input[1].cuda(non_blocking=True)),
+                input[2].cuda(non_blocking=True),
+                [crys_idx.cuda(non_blocking=True) for crys_idx in input[3]],
+            )
         else:
-            input_var = (Variable(torch.cat((input[0][0],input[0][1].reshape(int(input[0][1].shape[0]/32),1056)),dim=1).cuda(non_blocking=True)),
-                         Variable(input[1]),
-                         input[2],
-                         input[3])
+            input_var = (
+                Variable(
+                    torch.cat(
+                        (
+                            input[0][0],
+                            input[0][1].reshape(int(input[0][1].shape[0] / 32), 1056),
+                        ),
+                        dim=1,
+                    ).cuda(non_blocking=True)
+                ),
+                Variable(input[1]),
+                input[2],
+                input[3],
+            )
         # normalize target
         if args.task == "regression":
             target_normed = normalizer.norm(target)
@@ -647,6 +673,7 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
     del target
     del batch_cif_ids
 
+
 def validate(
     val_loader,
     model,
@@ -691,22 +718,46 @@ def validate(
     model.eval()
 
     end = time.time()
-   
+
     epoch_loss = 0
     for i, (input, target, batch_cif_ids) in enumerate(val_loader):
         if args.cuda:
             with torch.no_grad():
-                input_var = (Variable(torch.cat((input[0][0],input[0][1].reshape(int(input[0][1].shape[0]/32),1056)),dim=1).cuda(non_blocking=True)),
-                             Variable(input[1].cuda(non_blocking=True)),
-                             input[2].cuda(non_blocking=True),
-                             [crys_idx.cuda(non_blocking=True) for crys_idx in input[3]])
+                input_var = (
+                    Variable(
+                        torch.cat(
+                            (
+                                input[0][0],
+                                input[0][1].reshape(
+                                    int(input[0][1].shape[0] / 32), 1056
+                                ),
+                            ),
+                            dim=1,
+                        ).cuda(non_blocking=True)
+                    ),
+                    Variable(input[1].cuda(non_blocking=True)),
+                    input[2].cuda(non_blocking=True),
+                    [crys_idx.cuda(non_blocking=True) for crys_idx in input[3]],
+                )
         else:
             with torch.no_grad():
-                input_var = (Variable(torch.cat((input[0][0],input[0][1].reshape(int(input[0][1].shape[0]/32),1056)),dim=1)),
-                             Variable(input[1]),
-                             input[2],
-                             input[3])
-        if args.task == 'regression':
+                input_var = (
+                    Variable(
+                        torch.cat(
+                            (
+                                input[0][0],
+                                input[0][1].reshape(
+                                    int(input[0][1].shape[0] / 32), 1056
+                                ),
+                            ),
+                            dim=1,
+                        )
+                    ),
+                    Variable(input[1]),
+                    input[2],
+                    input[3],
+                )
+        if args.task == "regression":
             target_normed = normalizer.norm(target)
         else:
             target_normed = target.view(-1).long()
@@ -720,7 +771,7 @@ def validate(
         # compute output
         output = model(*input_var)
         loss = criterion(output, target_var)
-  
+
         # measure accuracy and record loss
         if args.task == "regression":
             mae_error = mae(normalizer.denorm(output.data.cpu()), target)
@@ -816,6 +867,7 @@ def validate(
     else:
         print(f"{star_label} {auc_scores.avg:.4f}")
         return auc_scores.avg
+
 
 class Normalizer(object):
     """Normalize a Tensor and restore it later."""

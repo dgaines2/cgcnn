@@ -8,6 +8,7 @@ class ConvLayer(nn.Module):
     """
     Convolutional operation on graphs
     """
+
     def __init__(self, atom_fea_len, nbr_fea_len):
         """
         Initialize ConvLayer.
@@ -23,11 +24,12 @@ class ConvLayer(nn.Module):
         super(ConvLayer, self).__init__()
         self.atom_fea_len = atom_fea_len
         self.nbr_fea_len = nbr_fea_len
-        self.fc_full = nn.Linear(2*self.atom_fea_len+self.nbr_fea_len,
-                                 2*self.atom_fea_len)
+        self.fc_full = nn.Linear(
+            2 * self.atom_fea_len + self.nbr_fea_len, 2 * self.atom_fea_len
+        )
         self.sigmoid = nn.Sigmoid()
         self.softplus1 = nn.Softplus()
-        self.bn1 = nn.BatchNorm1d(2*self.atom_fea_len)
+        self.bn1 = nn.BatchNorm1d(2 * self.atom_fea_len)
         self.bn2 = nn.BatchNorm1d(self.atom_fea_len)
         self.softplus2 = nn.Softplus()
 
@@ -59,11 +61,17 @@ class ConvLayer(nn.Module):
         N, M = nbr_fea_idx.shape
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
         total_nbr_fea = torch.cat(
-            [atom_in_fea.unsqueeze(1).expand(N, M, self.atom_fea_len),
-             atom_nbr_fea, nbr_fea], dim=2)
+            [
+                atom_in_fea.unsqueeze(1).expand(N, M, self.atom_fea_len),
+                atom_nbr_fea,
+                nbr_fea,
+            ],
+            dim=2,
+        )
         total_gated_fea = self.fc_full(total_nbr_fea)
-        total_gated_fea = self.bn1(total_gated_fea.view(
-            -1, self.atom_fea_len*2)).view(N, M, self.atom_fea_len*2)
+        total_gated_fea = self.bn1(
+            total_gated_fea.view(-1, self.atom_fea_len * 2)
+        ).view(N, M, self.atom_fea_len * 2)
         nbr_filter, nbr_core = total_gated_fea.chunk(2, dim=2)
         nbr_filter = self.sigmoid(nbr_filter)
         nbr_core = self.softplus1(nbr_core)
@@ -74,32 +82,75 @@ class ConvLayer(nn.Module):
 
 
 class OrbitalCrystalGraphConvNet(nn.Module):
-    def __init__(self, orig_atom_fea_len, nbr_fea_len, orig_hot_fea_len,
-                 atom_fea_len, hot_fea_len, h_fea_len, n_conv=3, n_h=1,
-                 classification=False):
+    """
+    Create a crystal graph convolutional neural network for predicting total
+    material properties.
+    """
+
+    def __init__(
+        self,
+        orig_atom_fea_len,
+        nbr_fea_len,
+        orgin_hot_fea_len=64,
+        atom_fea_len=64,
+        hot_fea_len=64,
+        h_fea_len=128,
+        n_conv=3,
+        n_h=1,
+        dropout_rate=0,
+        classification=False,
+    ):
+        """
+        Initialize CrystalGraphConvNet.
+
+        Parameters
+        ----------
+
+        orig_atom_fea_len: int
+          Number of atom features in the input.
+        nbr_fea_len: int
+          Number of bond features.
+        atom_fea_len: int
+          Number of hidden atom features in the convolutional layers
+        n_conv: int
+          Number of convolutional layers
+        h_fea_len: int
+          Number of hidden features after pooling
+        n_h: int
+          Number of hidden layers after pooling
+        use_dropout:
+          Use dropout in hidden layers after pooling
+        """
         super(OrbitalCrystalGraphConvNet, self).__init__()
         self.classification = classification
         self.embedding1 = nn.Linear(orig_atom_fea_len, hot_fea_len)
         self.relu = nn.Softplus()
+        self.use_dropout = True if dropout_rate != 0 else False
+        self.dropout_rate = dropout_rate
         self.embedding2 = nn.Linear(hot_fea_len, atom_fea_len)
-        self.convs = nn.ModuleList([ConvLayer(atom_fea_len=atom_fea_len,
-                                    nbr_fea_len=nbr_fea_len)
-                                    for _ in range(n_conv)])
+        self.convs = nn.ModuleList(
+            [
+                ConvLayer(atom_fea_len=atom_fea_len, nbr_fea_len=nbr_fea_len)
+                for _ in range(n_conv)
+            ]
+        )
         self.conv_to_fc = nn.Linear(atom_fea_len, h_fea_len)
-
         self.conv_to_fc_softplus = nn.Softplus()
         if n_h > 1:
-            self.fcs = nn.ModuleList([nn.Linear(h_fea_len, h_fea_len)
-                                      for _ in range(n_h-1)])
-            self.softpluses = nn.ModuleList([nn.Softplus()
-                                             for _ in range(n_h-1)])
+            self.fcs = nn.ModuleList(
+                [nn.Linear(h_fea_len, h_fea_len) for _ in range(n_h - 1)]
+            )
+            self.softpluses = nn.ModuleList([nn.Softplus() for _ in range(n_h - 1)])
         if self.classification:
             self.fc_out = nn.Linear(h_fea_len, 2)
         else:
             self.fc_out = nn.Linear(h_fea_len, 1)
         if self.classification:
+            dropout_rate = 0.5
             self.logsoftmax = nn.LogSoftmax(dim=1)
-            self.dropout = nn.Dropout()
+            self.dropout = nn.Dropout(dropout_rate)
+        if self.use_dropout:
+            self.dropout = nn.Dropout(self.dropout_rate)
 
     def forward(self, atom_fea, nbr_fea, nbr_fea_idx, crystal_atom_idx):
         atom_fea = self.embedding1(atom_fea)
@@ -109,20 +160,43 @@ class OrbitalCrystalGraphConvNet(nn.Module):
             atom_fea = conv_func(atom_fea, nbr_fea, nbr_fea_idx)
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
         crys_fea = self.conv_to_fc(self.conv_to_fc_softplus(crys_fea))
-        crys_fea = self.conv_to_fc_softplus(crys_fea)   
-        if self.classification:
-            crys_fea = self.dropout(crys_fea)
-        if hasattr(self, 'fcs') and hasattr(self, 'softpluses'):
+        crys_fea = self.conv_to_fc_softplus(crys_fea)
+        if hasattr(self, "fcs") and hasattr(self, "softpluses"):
             for fc, softplus in zip(self.fcs, self.softpluses):
-                crys_fea = softplus(fc(crys_fea))
+                if self.use_dropout:
+                    crys_fea = self.dropout(crys_fea)
+                    crys_fea = fc(crys_fea)
+                    crys_fea = softplus(crys_fea)
+                else:
+                    crys_fea = softplus(fc(crys_fea))
+        if self.use_dropout:
+            crys_fea = self.dropout(crys_fea)
         out = self.fc_out(crys_fea)
         if self.classification:
             out = self.logsoftmax(out)
         return out
 
     def pooling(self, atom_fea, crystal_atom_idx):
-        assert sum([len(idx_map) for idx_map in crystal_atom_idx]) ==  atom_fea.data.shape[0]
-        summed_fea = [torch.mean(atom_fea[idx_map], dim=0, keepdim=True)
-                      for idx_map in crystal_atom_idx]
-        return torch.cat(summed_fea, dim=0)
+        """
+        Pooling the atom features to crystal features
 
+        N: Total number of atoms in the batch
+        N0: Total number of crystals in the batch
+
+        Parameters
+        ----------
+
+        atom_fea: Variable(torch.Tensor) shape (N, atom_fea_len)
+          Atom feature vectors of the batch
+        crystal_atom_idx: list of torch.LongTensor of length N0
+          Mapping from the crystal idx to atom idx
+        """
+        assert (
+            sum([len(idx_map) for idx_map in crystal_atom_idx])
+            == atom_fea.data.shape[0]
+        )
+        summed_fea = [
+            torch.mean(atom_fea[idx_map], dim=0, keepdim=True)
+            for idx_map in crystal_atom_idx
+        ]
+        return torch.cat(summed_fea, dim=0)
