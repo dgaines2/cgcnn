@@ -13,6 +13,16 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import Sampler, SequentialSampler, SubsetRandomSampler
 
+from pymatgen.analysis.structure_analyzer import VoronoiConnectivity
+import os, sys
+import math
+import re
+import functools
+from pymatgen.core.structure import Structure, SiteCollection
+from pymatgen.analysis.structure_analyzer import VoronoiConnectivity
+from pymatgen.analysis.local_env import VoronoiNN, MinimumDistanceNN
+from ase.io import read, write
+
 
 class SubsetSampler(Sampler):
     def __init__(self, indices) -> None:
@@ -25,25 +35,9 @@ class SubsetSampler(Sampler):
         return len(self.indices)
 
 
-from pymatgen.analysis.structure_analyzer import VoronoiConnectivity
-import os, sys
-import math
-import re
-import functools
-from pymatgen.core.structure import Structure, SiteCollection
-from pymatgen.analysis.structure_analyzer import VoronoiConnectivity
-from pymatgen.analysis.local_env import VoronoiNN, MinimumDistanceNN
-from ase.io import read, write
-
-
 def make_cv_splitter(x, n_splits):
     for train_indices, val_indices in KFold(n_splits).split(x):
         yield train_indices, val_indices
-
-
-class SubsetSampler(Sampler):
-    def __init__(self, indices) -> None:
-        self.indices = indices
 
 
 def get_cv_loader(
