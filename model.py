@@ -59,7 +59,6 @@ class ConvLayer(nn.Module):
         """
         # TODO will there be problems with the index zero padding?
         N, M = nbr_fea_idx.shape
-        # convolution
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
         total_nbr_fea = torch.cat(
             [
@@ -82,7 +81,7 @@ class ConvLayer(nn.Module):
         return out
 
 
-class CrystalGraphConvNet(nn.Module):
+class OrbtialCrystalGraphConvNet(nn.Module):
     """
     Create a crystal graph convolutional neural network for predicting total
     material properties.
@@ -92,9 +91,11 @@ class CrystalGraphConvNet(nn.Module):
         self,
         orig_atom_fea_len,
         nbr_fea_len,
+        orgin_hot_fea_len=64,
         atom_fea_len=64,
-        n_conv=3,
+        hot_fea_len=64,
         h_fea_len=128,
+        n_conv=3,
         n_h=1,
         dropout_rate=0,
         classification=False,
@@ -120,11 +121,13 @@ class CrystalGraphConvNet(nn.Module):
         use_dropout:
           Use dropout in hidden layers after pooling
         """
-        super(CrystalGraphConvNet, self).__init__()
+        super(OrbitalCrystalGraphConvNet, self).__init__()
         self.classification = classification
+        self.embedding1 = nn.Linear(orig_atom_fea_len, hot_fea_len)
+        self.relu = nn.Softplus()
         self.use_dropout = True if dropout_rate != 0 else False
         self.dropout_rate = dropout_rate
-        self.embedding = nn.Linear(orig_atom_fea_len, atom_fea_len)
+        self.embedding2 = nn.Linear(hot_fea_len, atom_fea_len)
         self.convs = nn.ModuleList(
             [
                 ConvLayer(atom_fea_len=atom_fea_len, nbr_fea_len=nbr_fea_len)
@@ -150,33 +153,9 @@ class CrystalGraphConvNet(nn.Module):
             self.dropout = nn.Dropout(self.dropout_rate)
 
     def forward(self, atom_fea, nbr_fea, nbr_fea_idx, crystal_atom_idx):
-        """
-        Forward pass
-
-        N: Total number of atoms in the batch
-        M: Max number of neighbors
-        N0: Total number of crystals in the batch
-
-        Parameters
-        ----------
-
-        atom_fea: Variable(torch.Tensor) shape (N, orig_atom_fea_len)
-          Atom features from atom type
-        nbr_fea: Variable(torch.Tensor) shape (N, M, nbr_fea_len)
-          Bond features of each atom's M neighbors
-        nbr_fea_idx: torch.LongTensor shape (N, M)
-          Indices of M neighbors of each atom
-        crystal_atom_idx: list of torch.LongTensor of length N0
-          Mapping from the crystal idx to atom idx
-
-        Returns
-        -------
-
-        prediction: nn.Variable shape (N, )
-          Atom hidden features after convolution
-
-        """
-        atom_fea = self.embedding(atom_fea)
+        atom_fea = self.embedding1(atom_fea)
+        atom_fea = self.relu(atom_fea)
+        atom_fea = self.embedding2(atom_fea)
         for conv_func in self.convs:
             atom_fea = conv_func(atom_fea, nbr_fea, nbr_fea_idx)
         crys_fea = self.pooling(atom_fea, crystal_atom_idx)
@@ -221,3 +200,4 @@ class CrystalGraphConvNet(nn.Module):
             for idx_map in crystal_atom_idx
         ]
         return torch.cat(summed_fea, dim=0)
+

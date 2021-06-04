@@ -1,19 +1,22 @@
 import argparse
+import sys
 import os
 import shutil
-import sys
 import time
+from random import sample
 
 import numpy as np
+from sklearn import metrics
 import torch
 import torch.nn as nn
-from sklearn import metrics
+import torch.optim as optim
 from torch.autograd import Variable
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 
-from cgcnn.data import CIFData
-from cgcnn.data import collate_pool
-from cgcnn.model import CrystalGraphConvNet
+from ogcnn.model import CrystalGraphConvNet
+from ogcnn.data import collate_pool, get_train_val_test_loader
+from ogcnn.data import CIFData
 
 parser = argparse.ArgumentParser(description="Crystal gated neural networks")
 parser.add_argument("modelpath", help="path to the trained model.")
@@ -80,17 +83,25 @@ def main():
 
     # build model
     structures, _, _ = dataset[0]
-    orig_atom_fea_len = structures[0].shape[-1]
-    nbr_fea_len = structures[1].shape[-1]
-    model = CrystalGraphConvNet(
-        orig_atom_fea_len,
-        nbr_fea_len,
-        atom_fea_len=model_args.atom_fea_len,
-        n_conv=model_args.n_conv,
-        h_fea_len=model_args.h_fea_len,
-        n_h=model_args.n_h,
-        classification=True if model_args.task == "classification" else False,
-    )
+    orig_atom_fea_len = structures[0][0].shape[-1]     #92 features per atom
+    ofm_fea= int(structures[0][1].shape[0]/structures[0][0].shape[0])
+    nbr_fea_len = structures[1].shape[-1]      # 41 features per atom neighbors'
+    orig_hot_fea_len = structures[0][1].shape[1]*ofm_fea       # 1056 features per crystal
+    atom_fea_len = model_args.atom_fea_len
+    hot_fea_len = model_args.hot_fea_len
+    n_conv = model_args.n_conv
+    h_fea_len = model_args.h_fea_len
+    orig_atom_fea_len = orig_atom_fea_len + orig_hot_fea_len
+
+    model = OrbitalCrystalGraphConvNet(orig_atom_fea_len, nbr_fea_len,orig_hot_fea_len,
+                                 atom_fea_len=atom_fea_len,
+                                 hot_fea_len=hot_fea_len,
+                                 n_conv=n_conv,
+                                 h_fea_len=h_fea_len,
+                                 n_h=model_args.n_h,
+                                 classification=True if model_args.task ==
+                                                        'classification' else False,
+                                 dropout_rate=model_args.dropout_rate)
     if args.cuda:
         model.cuda()
 
@@ -134,7 +145,7 @@ def validate(
 ):
     batch_time = AverageMeter()
     losses = AverageMeter()
-    if args.task == "regression":
+    if model_args.task == "regression":
         mae_errors = AverageMeter()
     else:
         accuracies = AverageMeter()
@@ -166,19 +177,22 @@ def validate(
     model.eval()
 
     end = time.time()
+   
+    epoch_loss = 0
     for i, (input, target, batch_cif_ids) in enumerate(val_loader):
         if args.cuda:
             with torch.no_grad():
-                input_var = (
-                    Variable(input[0].cuda(non_blocking=True)),
-                    Variable(input[1].cuda(non_blocking=True)),
-                    input[2].cuda(non_blocking=True),
-                    [crys_idx.cuda(non_blocking=True) for crys_idx in input[3]],
-                )
+                input_var = (Variable(torch.cat((input[0][0],input[0][1].reshape(int(input[0][1].shape[0]/32),1056)),dim=1).cuda(non_blocking=True)),
+                             Variable(input[1].cuda(non_blocking=True)),
+                             input[2].cuda(non_blocking=True),
+                             [crys_idx.cuda(non_blocking=True) for crys_idx in input[3]])
         else:
             with torch.no_grad():
-                input_var = (Variable(input[0]), Variable(input[1]), input[2], input[3])
-        if args.task == "regression":
+                input_var = (Variable(torch.cat((input[0][0],input[0][1].reshape(int(input[0][1].shape[0]/32),1056)),dim=1)),
+                             Variable(input[1]),
+                             input[2],
+                             input[3])
+        if model_args.task == 'regression':
             target_normed = normalizer.norm(target)
         else:
             target_normed = target.view(-1).long()
@@ -192,9 +206,9 @@ def validate(
         # compute output
         output = model(*input_var)
         loss = criterion(output, target_var)
-
+  
         # measure accuracy and record loss
-        if args.task == "regression":
+        if model_args.task == "regression":
             mae_error = mae(normalizer.denorm(output.data.cpu()), target)
             losses.update(loss.data.cpu().item(), target.size(0))
             mae_errors.update(mae_error, target.size(0))
@@ -262,6 +276,10 @@ def validate(
                     )
                 )
             print(str_out)
+    del input
+    del batch_cif_ids
+    del target
+    torch.cuda.empty_cache()
 
     if test:
         star_label = "**"
@@ -270,7 +288,7 @@ def validate(
                 writer = csv.writer(f)
                 for cif_id, target, pred in zip(test_cif_ids, test_targets, test_preds):
                     writer.writerow((cif_id, target, pred))
-        if args.task == "regression":
+        if model_args.task == "regression":
             with open("results.out", "a") as fw:
                 fw.write(f"{star_label}  MAE: {mae_errors.avg:.4f}\n")
         else:
@@ -278,12 +296,13 @@ def validate(
                 fw.write(f"{star_label}  AUC: {auc_scores.avg:.4f}\n")
     else:
         star_label = "*"
-    if args.task == "regression":
+    if model_args.task == "regression":
         print(f"{star_label} {mae_errors.avg:.4f}")
         return mae_errors.avg
     else:
         print(f"{star_label} {auc_scores.avg:.4f}")
         return auc_scores.avg
+
 
 
 class Normalizer(object):
